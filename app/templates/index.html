@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rooty V0.1.0</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='spin.css') }}"> -->
+</head>
+<body>
+    <!-- Console toggle button container -->
+    <div class="console-toggle-container">
+        <input type="checkbox" id="toggleConsole" name="toggleConsole" value="console" checked>
+        <label for="toggleConsole">Debug</label>
+        <br>
+        <button onclick="fetchAndDisplayAccounts()">Fetch Accounts</button>
+    </div>
+
+    <div class="title-and-spinner">
+        <h1 id="pageTitle">Rooty V0.0.6</h1>
+        <div class="sk-cube-grid" hidden>
+            <div class="sk-cube sk-cube1"></div>
+            <div class="sk-cube sk-cube2"></div>
+            <div class="sk-cube sk-cube3"></div>
+            <div class="sk-cube sk-cube4"></div>
+            <div class="sk-cube sk-cube5"></div>
+            <div class="sk-cube sk-cube6"></div>
+            <div class="sk-cube sk-cube7"></div>
+            <div class="sk-cube sk-cube8"></div>
+            <div class="sk-cube sk-cube9"></div>
+        </div>
+    </div>
+    <div class="container">
+
+        <!-- <div class="console-column">
+            <h2>Console Output</h2>
+            <div id="consoleOutput"></div>
+        </div> -->
+        <div id="consoleOutput" class="console-column"></div>
+
+        <textarea id="inputBox" class="input-textarea" placeholder="Enter your text here"></textarea>
+        <!-- <button id="submitButton">Submit</button> -->
+        <div class="button-container">
+            <button id="initiateButton">Initiate</button>
+            <button id="submitButton">Submit</button>
+            <button id="closeButton">Close Conn</button>
+        </div>
+        <div id="spinner" class="loader" hidden></div> <!-- Spinner element -->
+        <div id="outputBox"></div> 
+        <!-- <textarea id="outputBox" class="output-textarea" readonly></textarea> -->
+    </div>
+
+    <div id="content"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- <script>
+        document.getElementById('content').innerHTML =
+        marked.parse('# Marked in browser\n\nRendered by **marked**.');
+    </script> -->
+
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</body>
+</html>
