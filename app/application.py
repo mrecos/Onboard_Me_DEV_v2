@@ -483,7 +483,17 @@ def get_transactions():
     return result
     # return jsonify(result)
 
-
+def get_transactions_for_user(username):
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Adjust the query and column names as needed. This assumes `transactions` has a `username` column.
+    c.execute("SELECT * FROM transactions WHERE username = %s", (username,))
+    transactions = c.fetchall()
+    columns = [desc[0] for desc in c.description]
+    result = [dict(zip(columns, t)) for t in transactions]
+    conn.close()
+    # Convert to JSON-serializable string if needed
+    return json.dumps(result)
 
 # endpoint to initiate conversation and load data
 @app.route('/initiate', methods=['GET'])
