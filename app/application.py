@@ -1,5 +1,10 @@
 # import libraries
-from flask import Flask, render_template, request, jsonify # for flask
+from flask import Flask, render_template, request, jsonify, Blueprint # for flask
+
+# import app functions
+from app.templates.api.v1.endpoints import api_v1
+from app.templates.api.v2.endpoints import api_v2
+
 # from openai import OpenAI     # for openAI assistant
 import openai 
 import os                     # for env variables
@@ -44,10 +49,12 @@ from langchain.output_parsers import PydanticOutputParser
 # crashing the app
 # from langchain.schema.runnable import RunnableConfig # for runnable config
 
-
-
 # initialize flask app
 app = Flask(__name__)
+# Register blueprints with version prefixes
+app.register_blueprint(api_v1, url_prefix='/api/v1')
+app.register_blueprint(api_v2, url_prefix='/api/v2')
+
 
 # list to store log messages
 log_messages = []
@@ -380,7 +387,7 @@ def insert_account_data(run_id, message_id, table_data):
     for key, value in renamed_table_data.items() :
         print ("updated keys: ", key,"\n")
 
-    add_log(f"Adding results to database")
+    add_log(f"Adding results to User Accounts database")
     # Use zip() to iterate over the lists safely
     for vendor, description, type_of_account, level_of_certainty, Total_Spending in zip(
         renamed_table_data['Vendor'],
