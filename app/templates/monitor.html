@@ -114,7 +114,7 @@
   <script>
     /* ---------- Logs Section ---------- */
     function fetchLogs() {
-        fetch('/logs')
+        fetch('/api/v1/logs')
           .then(response => response.json())
           .then(data => {
             const logOutput = document.getElementById('logOutput');
@@ -130,7 +130,7 @@
 
     /* ---------- LLM Output Section ---------- */
     function fetchLlmOutputs() {
-      fetch('/llm_outputs')
+      fetch('/api/v1/llm_outputs')
         .then(response => response.json())
         .then(data => {
           // data is an array of { timestamp, markdown }
@@ -185,11 +185,11 @@
         return;
       }
       
-      fetch(`/initiate?user_id=${encodeURIComponent(userIdValue)}`)
+      fetch(`/api/v1/initiate?user_id=${encodeURIComponent(userIdValue)}`)
         .then(response => response.json())
         .then(data => {
           console.log("Response from /initiate:", data);
-          alert(JSON.stringify(data));
+          // alert(JSON.stringify(data));
           // Immediately refresh logs & LLM
           fetchLogs();
           fetchLlmOutputs();

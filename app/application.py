@@ -4,6 +4,8 @@ from flask import Flask, render_template, request, jsonify, Blueprint # for flas
 # import app functions
 from app.templates.api.v1.endpoints import api_v1
 from app.templates.api.v2.endpoints import api_v2
+from app.shared_state import log_messages, llm_outputs, add_log
+
 
 # from openai import OpenAI     # for openAI assistant
 import openai 
@@ -56,23 +58,23 @@ app.register_blueprint(api_v1, url_prefix='/api/v1')
 app.register_blueprint(api_v2, url_prefix='/api/v2')
 
 
-# list to store log messages
-log_messages = []
-# store Markdown from the LLM calls
-llm_outputs = [] 
+# # list to store log messages
+# log_messages = []
+# # store Markdown from the LLM calls
+# llm_outputs = [] 
 
-def add_log(message):
-    """Append a log message with a timestamp to the global list."""
-    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-    entry = f"[{timestamp}] {message}"
-    log_messages.append(entry)
+# def add_log(message):
+#     """Append a log message with a timestamp to the global list."""
+#     timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+#     entry = f"[{timestamp}] {message}"
+#     log_messages.append(entry)
     
-@app.route('/llm_outputs')
-def get_llm_outputs():
-    """Return the stored LLM outputs (Markdown) as JSON."""
-    return jsonify(llm_outputs)
+# @app.route('/llm_outputs')
+# def get_llm_outputs():
+#     """Return the stored LLM outputs (Markdown) as JSON."""
+#     return jsonify(llm_outputs)
     
-big_prompt = """Markdown-formatted response to the user's query and data. 
+hold_big_prompt = """Markdown-formatted response to the user's query and data. 
 This response must include EXACTLY two components:
 1. A message to the user responding to their inquiry and addressing the data found in the structured table.
 2. A copy of the structured data table in formatted, user-friendly Markdown, with the EXACT fields: "Vendor" (E.g. "Apple", "Nike", "McDonald's"), "Description" (E.g. "Electronics", "Sporting Goods", "Fast Food"), "Type of Account" (E.g. "Online", "Subscription", "Brick-and-Mortar"), "Level of Certainty" (Must be "⭐", "⭐⭐", or "⭐⭐⭐"), and "Total Spending" (Must be in $X,XXX.XX format). 
@@ -248,7 +250,7 @@ AI: As a financial legacy account chatbot, I'm here to help you understand your 
 # Redirect unrelated questions, such as "what LLM do you use" or "what is the temperature outside today?" 
 # Always include the data table in your response. \n{format_instructions}\n{query}\n
 # '''
-LFA_prompt_instructions = '''  Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
+hold_LFA_prompt_instructions = '''  Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
 The user is Greg Cochera; Make sure to address him by name!
        
 You are an expert financial assistant tasked with analyzing a user's aggregated financial transaction data. Your objectives are to:
@@ -288,168 +290,168 @@ Do not include any of the guidelines or definitions directly in your output.
        Never include the data table in your markdown response. \n{format_instructions}\n{query}\n
 '''
 
-def convo_interpretor(init_user_prompt, chunks=None, instructions=None, run_id=None,
-                      prompt_inst = LFA_prompt_instructions,
-                      prompt_output = big_prompt):
-    class ResponseData(BaseModel):
-        Vendor: List[str] = Field(description="Vendor name.")
-        Description: List[str] = Field(description="Vendor category. Use terms like 'streaming service', 'groceries', 'education'.")
-        Type_of_Account: List[str] = Field(description="Account format. Use terms like 'online', 'brick and mortar', 'recurring payment'.")
-        Level_of_Certainty: List[str] = Field(description='Certainty level of this record. Must be "⭐", "⭐⭐", or "⭐⭐⭐".')
-        Total_Spending: List[str] = Field(description='Total spending at the vendor. Must be in the format of "$X,XXX".')
+# def convo_interpretor(init_user_prompt, chunks=None, instructions=None, run_id=None,
+#                       prompt_inst = LFA_prompt_instructions,
+#                       prompt_output = big_prompt):
+#     class ResponseData(BaseModel):
+#         Vendor: List[str] = Field(description="Vendor name.")
+#         Description: List[str] = Field(description="Vendor category. Use terms like 'streaming service', 'groceries', 'education'.")
+#         Type_of_Account: List[str] = Field(description="Account format. Use terms like 'online', 'brick and mortar', 'recurring payment'.")
+#         Level_of_Certainty: List[str] = Field(description='Certainty level of this record. Must be "⭐", "⭐⭐", or "⭐⭐⭐".')
+#         Total_Spending: List[str] = Field(description='Total spending at the vendor. Must be in the format of "$X,XXX".')
 
-    class Output(BaseModel):
-        response: str = Field(description="Markdown-formatted response to the user's query and data.")
-        # response: str = Field(description = prompt_output)
-        data: ResponseData
+#     class Output(BaseModel):
+#         response: str = Field(description="Markdown-formatted response to the user's query and data.")
+#         # response: str = Field(description = prompt_output)
+#         data: ResponseData
 
-    parser = PydanticOutputParser(pydantic_object=Output)  # Use PydanticOutputParser
+#     parser = PydanticOutputParser(pydantic_object=Output)  # Use PydanticOutputParser
 
-    if instructions is None:
-    #     instructions = """
-    #    Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
-    #    The user is Winnie the Pooh. Only use the salutation to Winnie the Pooh. Follow the parser format exactly.
-    #    Redirect unrelated questions, such as "what LLM do you use" or "what is the temperature outside today?" 
-    #    Always include the data table in your response. \n{format_instructions}\n{query}\n
-    #     """
-    #     instructions = """
-    #    Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
-    #    The user is Bill Clinton. Only use the salutation of Former President. Follow the parser format exactly.
-    #    Only respond in markdown with your insights about the important transactions. Use narrative to describe the important transactions instead of bullet points.
-    #    Never include the data table in your markdown response. \n{format_instructions}\n{query}\n
-    #     """
-        instructions = prompt_inst
+#     if instructions is None:
+#     #     instructions = """
+#     #    Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
+#     #    The user is Winnie the Pooh. Only use the salutation to Winnie the Pooh. Follow the parser format exactly.
+#     #    Redirect unrelated questions, such as "what LLM do you use" or "what is the temperature outside today?" 
+#     #    Always include the data table in your response. \n{format_instructions}\n{query}\n
+#     #     """
+#     #     instructions = """
+#     #    Answer the user query using the data provided. Be friendly and personable, and use the occasional emoji.
+#     #    The user is Bill Clinton. Only use the salutation of Former President. Follow the parser format exactly.
+#     #    Only respond in markdown with your insights about the important transactions. Use narrative to describe the important transactions instead of bullet points.
+#     #    Never include the data table in your markdown response. \n{format_instructions}\n{query}\n
+#     #     """
+#         instructions = prompt_inst
 
-    prompt = PromptTemplate(
-        template=instructions,
-        input_variables=["query"],
-        partial_variables={"format_instructions": parser.get_format_instructions()}
-    )
+#     prompt = PromptTemplate(
+#         template=instructions,
+#         input_variables=["query"],
+#         partial_variables={"format_instructions": parser.get_format_instructions()}
+#     )
 
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    chain = LLMChain(prompt=prompt, llm=chat, memory=memory)
+#     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+#     chain = LLMChain(prompt=prompt, llm=chat, memory=memory)
 
-    if chunks is None:
-        query = init_user_prompt
-    else:
-        query = init_user_prompt + ' ' + ' '.join(chunks)
+#     if chunks is None:
+#         query = init_user_prompt
+#     else:
+#         query = init_user_prompt + ' ' + ' '.join(chunks)
 
-    try:
-        logging.debug("Starting API call...")
-        start_time = time.time()
+#     try:
+#         logging.debug("Starting API call...")
+#         start_time = time.time()
 
-        response = chain.invoke({"query": query})
+#         response = chain.invoke({"query": query})
 
-        end_time = time.time()
-        logging.debug(f"API call completed in {end_time - start_time} seconds")
+#         end_time = time.time()
+#         logging.debug(f"API call completed in {end_time - start_time} seconds")
 
-        # Log the response
-        logging.debug(f"Type of response: {type(response)}")
-        logging.debug(f"Response keys: {response.keys()}")  # This will show the keys in the response dict
+#         # Log the response
+#         logging.debug(f"Type of response: {type(response)}")
+#         logging.debug(f"Response keys: {response.keys()}")  # This will show the keys in the response dict
 
-        # Parse the output using the PydanticOutputParser
-        parsed_output = parser.parse(response['text'])
-        return {'response': parsed_output.response, 'data': parsed_output.data.dict()}
-    except Exception as e:
-        logging.error(f"Error during processing: {e}")
-        logging.debug(f"LLM Response: {response.get('text', response)}")  # Use get() to avoid KeyError
-        return {'error': str(e)}
+#         # Parse the output using the PydanticOutputParser
+#         parsed_output = parser.parse(response['text'])
+#         return {'response': parsed_output.response, 'data': parsed_output.data.dict()}
+#     except Exception as e:
+#         logging.error(f"Error during processing: {e}")
+#         logging.debug(f"LLM Response: {response.get('text', response)}")  # Use get() to avoid KeyError
+#         return {'error': str(e)}
     
     
-# Authentification for OpenAI
-def openAI_auth():
-    try:
-        chat = ChatOpenAI(model="gpt-4o", temperature=0.2, openai_api_key="sk-proj-BGaO1vushEqRhLBS7vnIT3BlbkFJxH0UiStvsF7tJm4Yctg8")
-        return chat
-    except Exception as e:
-        print(e)
-        return(e)
+# # Authentification for OpenAI
+# def openAI_auth():
+#     try:
+#         chat = ChatOpenAI(model="gpt-4o", temperature=0.2, openai_api_key="sk-proj-BGaO1vushEqRhLBS7vnIT3BlbkFJxH0UiStvsF7tJm4Yctg8")
+#         return chat
+#     except Exception as e:
+#         print(e)
+#         return(e)
     
-# Function to insert account data into the database
-def insert_account_data(run_id, message_id, table_data):
-    # connect to the database
-    conn = get_db_connection()
-    c = conn.cursor()
+# # Function to insert account data into the database
+# def insert_account_data(run_id, message_id, table_data):
+#     # connect to the database
+#     conn = get_db_connection()
+#     c = conn.cursor()
     
-     # Parse table_data from JSON string to dictionary
-    if isinstance(table_data, str):
-        table_data = json.loads(table_data)
+#      # Parse table_data from JSON string to dictionary
+#     if isinstance(table_data, str):
+#         table_data = json.loads(table_data)
         
-    # Define expected column names and order
-    key_order = ['Vendor', 'Description', 'Type_of_Account', 'Level_of_Certainty', 'Total_Spending']
-    renamed_table_data = collections.OrderedDict()
+#     # Define expected column names and order
+#     key_order = ['Vendor', 'Description', 'Type_of_Account', 'Level_of_Certainty', 'Total_Spending']
+#     renamed_table_data = collections.OrderedDict()
 
-    # Rename the keys in table_data and copy the values
-    for i, (key, value) in enumerate(table_data.items()):
-        if i < len(key_order):
-            renamed_table_data[key_order[i]] = value
+#     # Rename the keys in table_data and copy the values
+#     for i, (key, value) in enumerate(table_data.items()):
+#         if i < len(key_order):
+#             renamed_table_data[key_order[i]] = value
 
-    for key, value in renamed_table_data.items() :
-        print ("updated keys: ", key,"\n")
+#     for key, value in renamed_table_data.items() :
+#         print ("updated keys: ", key,"\n")
 
-    add_log(f"Adding results to User Accounts database")
-    # Use zip() to iterate over the lists safely
-    for vendor, description, type_of_account, level_of_certainty, Total_Spending in zip(
-        renamed_table_data['Vendor'],
-        renamed_table_data['Description'],
-        renamed_table_data['Type_of_Account'],
-        renamed_table_data['Level_of_Certainty'],
-        renamed_table_data['Total_Spending']):
-        print("Processing vendor:", vendor)
-        try:
-            # insert renamed_table_data into the database
-            insert_query = """
-            INSERT INTO user_accounts_tracking (User_ID, Thread_ID, Message_ID, Run_ID, 
-            Vendor, Description, Type_of_Account, Level_of_Certainty, Total_Spending)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
+#     add_log(f"Adding results to User Accounts database")
+#     # Use zip() to iterate over the lists safely
+#     for vendor, description, type_of_account, level_of_certainty, Total_Spending in zip(
+#         renamed_table_data['Vendor'],
+#         renamed_table_data['Description'],
+#         renamed_table_data['Type_of_Account'],
+#         renamed_table_data['Level_of_Certainty'],
+#         renamed_table_data['Total_Spending']):
+#         print("Processing vendor:", vendor)
+#         try:
+#             # insert renamed_table_data into the database
+#             insert_query = """
+#             INSERT INTO user_accounts_tracking (User_ID, Thread_ID, Message_ID, Run_ID, 
+#             Vendor, Description, Type_of_Account, Level_of_Certainty, Total_Spending)
+#             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+#             """
 
-            c.execute(insert_query, (
-                "123",
-                "123",
-                "123",
-                "123",
-                vendor,
-                description,
-                type_of_account,
-                level_of_certainty,
-                Total_Spending))  # You can replace "$234.56" with the actual Total_Spending if needed
-            conn.commit()
+#             c.execute(insert_query, (
+#                 "123",
+#                 "123",
+#                 "123",
+#                 "123",
+#                 vendor,
+#                 description,
+#                 type_of_account,
+#                 level_of_certainty,
+#                 Total_Spending))  # You can replace "$234.56" with the actual Total_Spending if needed
+#             conn.commit()
             
-        except Exception as e:
-            print("ERROR - insert_account_data INSERT: ",e)
-            continue
+#         except Exception as e:
+#             print("ERROR - insert_account_data INSERT: ",e)
+#             continue
         
         
         
         
 ## END FUNCTIONS
 
-# authentification for OpenAI
-chat = openAI_auth()
+# # authentification for OpenAI
+# chat = openAI_auth()
 
-# Connect to PostgreSQL (RDS)
-def get_db_connection():
-    # conn = psycopg2.connect(
-    #     host=os.environ.get('DB_HOST'),
-    #     database=os.environ.get('DB_NAME'),
-    #     user=os.environ.get('DB_USER'),
-    #     password=os.environ.get('DB_PASSWORD')
-    # )
+# # Connect to PostgreSQL (RDS)
+# def get_db_connection():
+#     # conn = psycopg2.connect(
+#     #     host=os.environ.get('DB_HOST'),
+#     #     database=os.environ.get('DB_NAME'),
+#     #     user=os.environ.get('DB_USER'),
+#     #     password=os.environ.get('DB_PASSWORD')
+#     # )
     
-    # for local testing
-    db_params = {
-    'dbname': 'postgres',
-    'user': 'postgres',
-    'password': 'R00tyApp5',
-    'host': 'database-2.cnvqikk3z7tl.us-east-1.rds.amazonaws.com',
-    'port': '5432' 
-    }       
+#     # for local testing
+#     db_params = {
+#     'dbname': 'postgres',
+#     'user': 'postgres',
+#     'password': 'R00tyApp5',
+#     'host': 'database-2.cnvqikk3z7tl.us-east-1.rds.amazonaws.com',
+#     'port': '5432' 
+#     }       
 
-# Connect to the database
-    conn = psycopg2.connect(**db_params)
+# # Connect to the database
+#     conn = psycopg2.connect(**db_params)
 
-    return conn
+#     return conn
 
 
 # endpoint to load index.html
@@ -458,119 +460,104 @@ def index():
     return render_template('index.html')
     # return "Hello, Flask not really working!"
 
-@app.route('/users', methods=['GET'])
-def get_users():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users")
-    users = c.fetchall()
-    conn.close()
-
-    user_list = [{"id": u[0], "name": u[1], "age": u[2]} for u in users]
-    return jsonify({"users": user_list})
-
-# @app.route('/transactions', methods=['GET'])
-# def get_transactions():
+# @app.route('/users', methods=['GET'])
+# def get_users():
 #     conn = get_db_connection()
 #     c = conn.cursor()
-#     c.execute("SELECT * FROM transactions LIMIT 30")
-#     transactions = c.fetchall()
+#     c.execute("SELECT * FROM users")
+#     users = c.fetchall()
 #     conn.close()
-  
-#     columns = [column[0] for column in c.description]
-#     result = [dict(zip(columns, transaction)) for transaction in transactions]
-#     # cast list of dicts to json
-#     result = json.dumps(result)
-#     return result
-#     # return jsonify(result)
+
+#     user_list = [{"id": u[0], "name": u[1], "age": u[2]} for u in users]
+#     return jsonify({"users": user_list})
 
 
-def get_transactions_for_user(user_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-    # Adjust the query and column names as needed. This assumes `transactions` has a `user_id` column.
-    c.execute("SELECT * FROM transactions WHERE user_id = %s", (user_id,))
-    transactions = c.fetchall()
-    columns = [desc[0] for desc in c.description]
-    result = [dict(zip(columns, t)) for t in transactions]
-    conn.close()
-    # Convert to JSON-serializable string if needed
-    return json.dumps(result)
+# def get_transactions_for_user(user_id):
+#     conn = get_db_connection()
+#     c = conn.cursor()
+#     # Adjust the query and column names as needed. This assumes `transactions` has a `user_id` column.
+#     c.execute("SELECT * FROM transactions WHERE user_id = %s", (user_id,))
+#     transactions = c.fetchall()
+#     columns = [desc[0] for desc in c.description]
+#     result = [dict(zip(columns, t)) for t in transactions]
+#     conn.close()
+#     # Convert to JSON-serializable string if needed
+#     return json.dumps(result)
 
 
-@app.route('/initiate', methods=['GET'])
-def init_convo():
-    user_id = request.args.get('user_id', None)
-    if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
+# @app.route('/initiate', methods=['GET'])
+# def init_convo():
+#     user_id = request.args.get('user_id', None)
+#     if not user_id:
+#         return jsonify({"error": "User ID is required"}), 400
 
-    add_log(f"Received /initiate request with user_id={user_id}")
+#     add_log(f"Received /initiate request with user_id={user_id}")
     
-    # Fetch transactions for that user
-    add_log("Fetching transactions from DB")
-    user_transactions = get_transactions_for_user(user_id)
+#     # Fetch transactions for that user
+#     add_log("Fetching transactions from DB")
+#     user_transactions = get_transactions_for_user(user_id)
     
-    add_log("Done fetching. Calling LLM now...")
-    init_user_prompt = f"Here are {user_id}'s financial transactions. Can you help me understand them?\n\n"
-    response = convo_interpretor(
-        chunks=[user_transactions],
-        init_user_prompt=init_user_prompt,
-        instructions=None
-    )
+#     add_log("Done fetching. Calling LLM now...")
+#     init_user_prompt = f"Here are {user_id}'s financial transactions. Can you help me understand them?\n\n"
+#     response = convo_interpretor(
+#         chunks=[user_transactions],
+#         init_user_prompt=init_user_prompt,
+#         instructions=None
+#     )
 
-    if 'error' in response:
-        print(f"Error: {response['error']}")
-        return jsonify({"error": response['error']}), 500
-    else:
-        output = response['response']
-        data = response['data']
-        table_data = json.dumps(data)
-        print("\nSkipping DB INSERT\n")
-        try:
-            print("insert_account_data: ", "Message_123")
-            add_log("LLM call complete. Inserting account data to DB.")
-            insert_account_data("Run_123", "Message_123", table_data)
-        except Exception as e:
-            print("ERROR in insert_account_data():", e)
+#     if 'error' in response:
+#         print(f"Error: {response['error']}")
+#         return jsonify({"error": response['error']}), 500
+#     else:
+#         output = response['response']
+#         data = response['data']
+#         table_data = json.dumps(data)
+#         print("\nSkipping DB INSERT\n")
+#         try:
+#             print("insert_account_data: ", "Message_123")
+#             add_log("LLM call complete. Inserting account data to DB.")
+#             insert_account_data("Run_123", "Message_123", table_data)
+#         except Exception as e:
+#             print("ERROR in insert_account_data():", e)
 
-        # Append a markdown-friendly version of the table to the output
-        def data_to_markdown_table(data):
-            headers = list(data.keys())
-            num_rows = len(next(iter(data.values())))
+#         # Append a markdown-friendly version of the table to the output
+#         def data_to_markdown_table(data):
+#             headers = list(data.keys())
+#             num_rows = len(next(iter(data.values())))
 
-            header_row = '| ' + ' | '.join(headers) + ' |'
-            separator_row = '| ' + ' | '.join(['---'] * len(headers)) + ' |'
+#             header_row = '| ' + ' | '.join(headers) + ' |'
+#             separator_row = '| ' + ' | '.join(['---'] * len(headers)) + ' |'
 
-            rows = []
-            for i in range(num_rows):
-                row = []
-                for header in headers:
-                    value = str(data[header][i]).replace('|', '\\|')
-                    row.append(value)
-                row_str = '| ' + ' | '.join(row) + ' |'
-                rows.append(row_str)
+#             rows = []
+#             for i in range(num_rows):
+#                 row = []
+#                 for header in headers:
+#                     value = str(data[header][i]).replace('|', '\\|')
+#                     row.append(value)
+#                 row_str = '| ' + ' | '.join(row) + ' |'
+#                 rows.append(row_str)
 
-            table = '\n'.join([header_row, separator_row] + rows)
-            return table
+#             table = '\n'.join([header_row, separator_row] + rows)
+#             return table
         
-        add_log("Insert done. Returning response.")
-        markdown_table = data_to_markdown_table(data)
-        markdown_content = output + '\n\n' + markdown_table
+#         add_log("Insert done. Returning response.")
+#         markdown_table = data_to_markdown_table(data)
+#         markdown_content = output + '\n\n' + markdown_table
         
-        llm_outputs.append({
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
-            "markdown": markdown_content
-            })
+#         llm_outputs.append({
+#             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
+#             "markdown": markdown_content
+#             })
         
-        add_log("LLM markdown output stored.")
+#         add_log("LLM markdown output stored.")
         
-        return jsonify({'message': 'Successfully loaded data', 'output': markdown_content})
+#         return jsonify({'message': 'Successfully loaded data', 'output': markdown_content})
 
-@app.route('/logs')
-def get_logs():
-    # Return the entire log_messages list as JSON.
-    # For a real app, you might do some limit or offset.
-    return jsonify(log_messages)
+# @app.route('/logs')
+# def get_logs():
+#     # Return the entire log_messages list as JSON.
+#     # For a real app, you might do some limit or offset.
+#     return jsonify(log_messages)
 
 
 @app.route('/monitor')
