@@ -122,31 +122,24 @@ function createMarkdownTable(jsonArray) {
 // initiate button and data fetch (transactions.csv or database)
 document.getElementById('initiateButton').addEventListener('click', function() {
     console.log("Clicked Initiate button");
+    var userIdValue = document.getElementById('userIdInput').value; // Get the value from the input field
 
-     // Show the spinner
-    //  document.querySelector('.sk-cube-grid').hidden = false;
-
-    fetch('/initiate')
+    // Append user_id as a query parameter to the request URL
+    fetch('/initiate?user_id=' + encodeURIComponent(userIdValue))
     .then(response => response.json())
-    // format transaction data into table for display in outputBox
     .then(data => {
         if (data.message) {
-            // document.querySelector('.sk-cube-grid').hidden = true;
-            console.log(data.message);  // Log the message to the console
-
-            // display full output as markdown
+            console.log(data.message);
             if (data.output) {
-                const renderedHtml = marked.parse(data.output); // Convert Markdown to HTML
-                document.getElementById('outputBox').innerHTML = renderedHtml; // Display in outputBox
+                const renderedHtml = marked.parse(data.output);
+                document.getElementById('outputBox').innerHTML = renderedHtml; 
             }
         } else if (data.error) {
-            document.querySelector('.sk-cube-grid').hidden = true;
             console.error('Error:', data.error);
             document.getElementById('outputBox').innerHTML = 'Error: ' + data.error;
         }
     })
     .catch(error => {
-        document.querySelector('.sk-cube-grid').hidden = true;
         console.error('Error:', error);
         document.getElementById('outputBox').innerHTML = 'Request failed';
     });

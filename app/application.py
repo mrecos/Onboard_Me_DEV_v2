@@ -16,8 +16,6 @@ from pydantic import ValidationError # for pydantic validation error
 from typing import List
 import collections  
 
-
-
 #added 9/6
 import psycopg2
 import logging
@@ -46,6 +44,27 @@ from langchain.output_parsers import PydanticOutputParser
 # crashing the app
 # from langchain.schema.runnable import RunnableConfig # for runnable config
 
+
+
+# initialize flask app
+app = Flask(__name__)
+
+# list to store log messages
+log_messages = []
+# store Markdown from the LLM calls
+llm_outputs = [] 
+
+def add_log(message):
+    """Append a log message with a timestamp to the global list."""
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    entry = f"[{timestamp}] {message}"
+    log_messages.append(entry)
+    
+@app.route('/llm_outputs')
+def get_llm_outputs():
+    """Return the stored LLM outputs (Markdown) as JSON."""
+    return jsonify(llm_outputs)
+    
 big_prompt = """Markdown-formatted response to the user's query and data. 
 This response must include EXACTLY two components:
 1. A message to the user responding to their inquiry and addressing the data found in the structured table.
@@ -361,6 +380,7 @@ def insert_account_data(run_id, message_id, table_data):
     for key, value in renamed_table_data.items() :
         print ("updated keys: ", key,"\n")
 
+    add_log(f"Adding results to database")
     # Use zip() to iterate over the lists safely
     for vendor, description, type_of_account, level_of_certainty, Total_Spending in zip(
         renamed_table_data['Vendor'],
@@ -388,30 +408,7 @@ def insert_account_data(run_id, message_id, table_data):
                 level_of_certainty,
                 Total_Spending))  # You can replace "$234.56" with the actual Total_Spending if needed
             conn.commit()
-
-        # for i in range(len(renamed_table_data['Vendor'])):
-        #     print("looping", i, renamed_table_data['Vendor'][i], "\n" )
-        #     try:
-                
-        #         # insert renamed_table_data into the database
-        #         insert_query = """
-        #         INSERT INTO user_accounts_tracking (User_ID, Thread_ID, Message_ID, Run_ID, 
-        #         Vendor, Description, Type_of_Account, Level_of_Certainty, Total_Spending)
-        #         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        #         """
-                
-        #         c.execute(insert_query, (
-        #             "123",
-        #             "123",
-        #             "123",
-        #             "123",
-        #             renamed_table_data['Vendor'][i],
-        #             renamed_table_data['Description'][i],
-        #             renamed_table_data['Type_of_Account'][i],
-        #             renamed_table_data['Level_of_Certainty'][i],
-        #             "$234.56"))
-        #         conn.commit()
-    
+            
         except Exception as e:
             print("ERROR - insert_account_data INSERT: ",e)
             continue
@@ -420,9 +417,6 @@ def insert_account_data(run_id, message_id, table_data):
         
         
 ## END FUNCTIONS
-
-# initialize flask app
-app = Flask(__name__)
 
 # authentification for OpenAI
 chat = openAI_auth()
@@ -468,26 +462,27 @@ def get_users():
     user_list = [{"id": u[0], "name": u[1], "age": u[2]} for u in users]
     return jsonify({"users": user_list})
 
-@app.route('/transactions', methods=['GET'])
-def get_transactions():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM transactions LIMIT 30")
-    transactions = c.fetchall()
-    conn.close()
+# @app.route('/transactions', methods=['GET'])
+# def get_transactions():
+#     conn = get_db_connection()
+#     c = conn.cursor()
+#     c.execute("SELECT * FROM transactions LIMIT 30")
+#     transactions = c.fetchall()
+#     conn.close()
   
-    columns = [column[0] for column in c.description]
-    result = [dict(zip(columns, transaction)) for transaction in transactions]
-    # cast list of dicts to json
-    result = json.dumps(result)
-    return result
-    # return jsonify(result)
+#     columns = [column[0] for column in c.description]
+#     result = [dict(zip(columns, transaction)) for transaction in transactions]
+#     # cast list of dicts to json
+#     result = json.dumps(result)
+#     return result
+#     # return jsonify(result)
 
-def get_transactions_for_user(username):
+
+def get_transactions_for_user(user_id):
     conn = get_db_connection()
     c = conn.cursor()
-    # Adjust the query and column names as needed. This assumes `transactions` has a `username` column.
-    c.execute("SELECT * FROM transactions WHERE username = %s", (username,))
+    # Adjust the query and column names as needed. This assumes `transactions` has a `user_id` column.
+    c.execute("SELECT * FROM transactions WHERE user_id = %s", (user_id,))
     transactions = c.fetchall()
     columns = [desc[0] for desc in c.description]
     result = [dict(zip(columns, t)) for t in transactions]
@@ -495,6 +490,93 @@ def get_transactions_for_user(username):
     # Convert to JSON-serializable string if needed
     return json.dumps(result)
 
+
+@app.route('/initiate', methods=['GET'])
+def init_convo():
+    user_id = request.args.get('user_id', None)
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    add_log(f"Received /initiate request with user_id={user_id}")
+    
+    # Fetch transactions for that user
+    add_log("Fetching transactions from DB")
+    user_transactions = get_transactions_for_user(user_id)
+    
+    add_log("Done fetching. Calling LLM now...")
+    init_user_prompt = f"Here are {user_id}'s financial transactions. Can you help me understand them?\n\n"
+    response = convo_interpretor(
+        chunks=[user_transactions],
+        init_user_prompt=init_user_prompt,
+        instructions=None
+    )
+
+    if 'error' in response:
+        print(f"Error: {response['error']}")
+        return jsonify({"error": response['error']}), 500
+    else:
+        output = response['response']
+        data = response['data']
+        table_data = json.dumps(data)
+        print("\nSkipping DB INSERT\n")
+        try:
+            print("insert_account_data: ", "Message_123")
+            add_log("LLM call complete. Inserting account data to DB.")
+            insert_account_data("Run_123", "Message_123", table_data)
+        except Exception as e:
+            print("ERROR in insert_account_data():", e)
+
+        # Append a markdown-friendly version of the table to the output
+        def data_to_markdown_table(data):
+            headers = list(data.keys())
+            num_rows = len(next(iter(data.values())))
+
+            header_row = '| ' + ' | '.join(headers) + ' |'
+            separator_row = '| ' + ' | '.join(['---'] * len(headers)) + ' |'
+
+            rows = []
+            for i in range(num_rows):
+                row = []
+                for header in headers:
+                    value = str(data[header][i]).replace('|', '\\|')
+                    row.append(value)
+                row_str = '| ' + ' | '.join(row) + ' |'
+                rows.append(row_str)
+
+            table = '\n'.join([header_row, separator_row] + rows)
+            return table
+        
+        add_log("Insert done. Returning response.")
+        markdown_table = data_to_markdown_table(data)
+        markdown_content = output + '\n\n' + markdown_table
+        
+        llm_outputs.append({
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
+            "markdown": markdown_content
+            })
+        
+        add_log("LLM markdown output stored.")
+        
+        return jsonify({'message': 'Successfully loaded data', 'output': markdown_content})
+
+@app.route('/logs')
+def get_logs():
+    # Return the entire log_messages list as JSON.
+    # For a real app, you might do some limit or offset.
+    return jsonify(log_messages)
+
+
+@app.route('/monitor')
+def monitor():
+    return render_template('monitor.html')
+
+if __name__ == '__main__':
+    logging.basicConfig(filename='app.log', level=logging.INFO)
+    app.run(debug=True)
+    
+    
+
+'''
 # endpoint to initiate conversation and load data
 @app.route('/initiate', methods=['GET'])
 def init_convo():
@@ -628,7 +710,7 @@ def init_convo():
     # print("MARKDOWN_CONTENT:\n" + str(markdown_content), "\n\n")
     # print("TABLE_CONTENT:\n"    + str(table_data), "\n\n")
     return jsonify({'message': 'Successfully loaded data', 'output': markdown_content})
-
+'''
 '''
 # endpoint to process user input
 @app.route('/process', methods=['POST'])
@@ -712,6 +794,6 @@ def close_connection():
 '''
 
 
-if __name__ == '__main__':
-    logging.basicConfig(filename='app.log', level=logging.INFO)
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     logging.basicConfig(filename='app.log', level=logging.INFO)
+#     app.run(debug=True)
