@@ -239,7 +239,7 @@
       fetch(`/api/v1/initiate?user_id=${encodeURIComponent(userIdValue)}`)
         .then(response => response.json())
         .then(data => {
-          alert(JSON.stringify(data));
+          // alert(JSON.stringify(data));
           // Refresh everything right away
           fetchLogs();
           fetchLlmOutputs();
