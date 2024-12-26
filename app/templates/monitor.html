@@ -1,57 +1,51 @@
-<!-- templates/monitor.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Application Monitor</title>
-
-  <!-- Include Bootstrap CSS -->
+  
+  <!-- Bootstrap CSS -->
   <link 
     rel="stylesheet" 
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
   >
-  <!-- Marked library for Markdown -> HTML conversion -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
+  <!-- Marked library for rendering Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
   <style>
-    #logOutput {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        padding: 1rem;
-        border-radius: 0.25rem;
-        height: 250px;
-        overflow-y: auto;
-        white-space: pre-wrap; 
-      }
-    #llmOutputList {
+    .scroll-box {
+      height: 220px;
+      overflow-y: auto;
       background-color: #f8f9fa;
       border: 1px solid #dee2e6;
       padding: 1rem;
       border-radius: 0.25rem;
-      height: 250px;
-      overflow-y: auto;
+    }
+    /* For text-based logs with line breaks preserved */
+    #logOutput {
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body class="bg-light">
-
+  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3">
     <div class="container-fluid">
-      <span class="navbar-brand mb-0 h1">Rooty Monitor</span>
+      <span class="navbar-brand mb-0 h1">Demo Monitor</span>
     </div>
   </nav>
 
   <div class="container">
-    <!-- Row with 2 columns: Control panel & Logs -->
     <div class="row">
-      <!-- Left column: Controls -->
+      <!-- Left Column: Control Panel -->
       <div class="col-md-4 mb-3">
         <div class="card">
           <div class="card-header">
             <h5>Control Panel</h5>
           </div>
           <div class="card-body">
-            <p>Trigger the <code>/initiate</code> endpoint with a user ID:</p>
+            <!-- Input for user_id -->
             <div class="mb-3">
               <label for="userIdInput" class="form-label">User ID</label>
               <input 
@@ -61,143 +55,215 @@
                 placeholder="e.g. 123"
               >
             </div>
-            <button class="btn btn-primary" id="initiateButton">
+            <!-- Button to call /initiate -->
+            <button class="btn btn-primary mb-3" id="initiateButton">
               Call /initiate
             </button>
-
             <hr>
-
-            <p>Logs refresh every 5s, or click here:</p>
-            <button class="btn btn-secondary" id="refreshLogsBtn">
-              Refresh Logs
-            </button>
-
+            <p>Refresh each panel manually:</p>
+            <button class="btn btn-secondary mb-1" id="refreshLogsBtn">Refresh Logs</button>
+            <button class="btn btn-secondary mb-1" id="refreshLlmBtn">Refresh LLM</button>
+            <button class="btn btn-secondary" id="refreshRowsBtn">Refresh Rows</button>
             <hr>
-
-            <p>LLM Output refresh every 5s, or click here:</p>
-            <button class="btn btn-secondary" id="refreshLlmBtn">
-              Refresh LLM Outputs
-            </button>
+            <p>They also auto-refresh every 5 seconds.</p>
           </div>
         </div>
       </div>
 
-      <!-- Right column: Log display + LLM Output display -->
+      <!-- Right Column: 3 Cards for Logs, LLM Output, and Recent Rows -->
       <div class="col-md-8">
-        <div class="row">
-          <div class="col-12 mb-3">
-            <div class="card">
-              <div class="card-header">
-                <h5>Live Logs</h5>
-              </div>
-              <div class="card-body">
-                <div id="logOutput" class="small text-muted"></div>
-              </div>
-            </div>
+        
+        <!-- Logs Card -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5>Live Logs</h5>
           </div>
-          <div class="col-12">
-            <div class="card">
-              <div class="card-header">
-                <h5>LLM Output History</h5>
-              </div>
-              <div class="card-body">
-                <!-- We'll render each LLM markdown output as a block inside here -->
-                <div id="llmOutputList"></div>
-              </div>
-            </div>
+          <div class="card-body scroll-box">
+            <div id="logOutput" class="small text-muted"></div>
           </div>
-        </div> <!-- /row -->
-      </div>
-    </div>
-  </div>
+        </div>
 
+        <!-- LLM Output Card -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5>LLM Response History</h5>
+          </div>
+          <div class="card-body scroll-box" id="llmOutputList">
+            <!-- We'll render LLM outputs here -->
+          </div>
+        </div>
+
+        <!-- Recent DB Rows Card -->
+        <div class="card">
+          <div class="card-header">
+            <h5>Recent DB Rows for User</h5>
+          </div>
+          <div class="card-body scroll-box">
+            <table class="table table-sm" id="recentRowsTable">
+              <thead id="recentRowsHeader"></thead>
+              <tbody id="recentRowsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div> <!-- /col-md-8 -->
+    </div> <!-- /row -->
+  </div> <!-- /container -->
+
+  <!-- Bootstrap JS (optional) -->
+  <script 
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+  ></script>
+  
   <script>
-    /* ---------- Logs Section ---------- */
+    /* ===================== LOGS SECTION ===================== */
     function fetchLogs() {
-        fetch('/api/v1/logs')
-          .then(response => response.json())
-          .then(data => {
-            const logOutput = document.getElementById('logOutput');
-            // Join each log entry with a newline
-            logOutput.textContent = data.join("\n");
-            // Auto-scroll to bottom
-            logOutput.scrollTop = logOutput.scrollHeight;
-          })
-          .catch(err => {
-            console.error("Error fetching logs:", err);
-          });
-      }
+      fetch('/api/v1/logs')
+        .then(response => response.json())
+        .then(data => {
+          const logOutput = document.getElementById('logOutput');
+          // Join each log entry with a newline
+          logOutput.textContent = data.join("\n");
+          logOutput.scrollTop = logOutput.scrollHeight;
+        })
+        .catch(err => {
+          console.error("Error fetching logs:", err);
+        });
+    }
 
-    /* ---------- LLM Output Section ---------- */
+    /* ===================== LLM OUTPUT SECTION ===================== */
     function fetchLlmOutputs() {
       fetch('/api/v1/llm_outputs')
         .then(response => response.json())
         .then(data => {
-          // data is an array of { timestamp, markdown }
+          // data is an array of objects, e.g. [{timestamp: "...", markdown: "..."}]
           const container = document.getElementById('llmOutputList');
-          container.innerHTML = ''; // Clear old contents
-
+          container.innerHTML = ''; // clear old content
+          
           data.forEach(entry => {
-            // We can create a small wrapper for each LLM output
+            // We'll create a small wrapper for each LLM output
             const wrapper = document.createElement('div');
-            wrapper.classList.add("mb-3", "p-2", "border", "rounded");
-
-            // Create a heading for the timestamp
+            wrapper.classList.add('mb-3', 'p-2', 'border', 'rounded');
+            
+            // A heading with timestamp
             const title = document.createElement('h6');
             title.textContent = `Timestamp: ${entry.timestamp}`;
             wrapper.appendChild(title);
-
-            // Convert the markdown to HTML using 'marked'
-            const renderedHtml = marked.parse(entry.markdown);
             
-            // Create a div for the rendered content
-            const markdownDiv = document.createElement('div');
-            markdownDiv.innerHTML = renderedHtml;
-            wrapper.appendChild(markdownDiv);
+            // Convert the markdown to HTML using 'marked'
+            let renderedHtml = '';
+            if (entry.markdown) {
+              renderedHtml = marked.parse(entry.markdown);
+            } else if (entry.text) {
+              // If your data uses 'text' instead of 'markdown'
+              renderedHtml = marked.parse(entry.text);
+            }
+
+            // Insert the rendered HTML
+            const contentDiv = document.createElement('div');
+            contentDiv.innerHTML = renderedHtml;
+            wrapper.appendChild(contentDiv);
 
             container.appendChild(wrapper);
           });
-
-          container.scrollTop = container.scrollHeight; // auto-scroll
+          container.scrollTop = container.scrollHeight;
         })
         .catch(err => {
           console.error("Error fetching LLM outputs:", err);
         });
     }
 
-    /* ---------- Setup: Polling & Event Listeners ---------- */
-    // Poll logs and LLM outputs every 5 seconds
-    setInterval(fetchLogs, 5000);
-    setInterval(fetchLlmOutputs, 5000);
+    /* ===================== RECENT DB ROWS SECTION ===================== */
+    function fetchRecentRows() {
+      const userId = document.getElementById('userIdInput').value.trim();
+      if (!userId) return; // if no user, do nothing
 
-    document.getElementById('refreshLogsBtn').addEventListener('click', fetchLogs);
-    document.getElementById('refreshLlmBtn').addEventListener('click', fetchLlmOutputs);
+      fetch(`/api/v1/recent_rows?user_id=${encodeURIComponent(userId)}`)
+        .then(response => response.json())
+        .then(data => {
+          renderRecentRowsTable(data);
+        })
+        .catch(err => {
+          console.error("Error fetching recent rows:", err);
+        });
+    }
 
-    // On page load, fetch logs + LLM outputs
-    fetchLogs();
-    fetchLlmOutputs();
+    function renderRecentRowsTable(data) {
+      const headerEl = document.getElementById('recentRowsHeader');
+      const bodyEl = document.getElementById('recentRowsBody');
 
-    // "Call /initiate" button
+      headerEl.innerHTML = '';
+      bodyEl.innerHTML = '';
+
+      if (!Array.isArray(data) || data.length === 0) {
+        headerEl.innerHTML = '<tr><th>No data</th></tr>';
+        return;
+      }
+
+      // Extract columns from the first row
+      const columns = Object.keys(data[0]);
+
+      // Build table header
+      const headerRow = document.createElement('tr');
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        headerRow.appendChild(th);
+      });
+      headerEl.appendChild(headerRow);
+
+      // Build table rows
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        columns.forEach(col => {
+          const td = document.createElement('td');
+          let cellValue = row[col];
+          if (cellValue && typeof cellValue === 'object') {
+            cellValue = JSON.stringify(cellValue);
+          }
+          td.textContent = cellValue;
+          tr.appendChild(td);
+        });
+        bodyEl.appendChild(tr);
+      });
+    }
+
+    /* ===================== EVENT LISTENERS & POLLING ===================== */
     document.getElementById('initiateButton').addEventListener('click', function() {
       const userIdValue = document.getElementById('userIdInput').value.trim();
       if (!userIdValue) {
         alert("Please enter a valid user ID.");
         return;
       }
-      
+
       fetch(`/api/v1/initiate?user_id=${encodeURIComponent(userIdValue)}`)
         .then(response => response.json())
         .then(data => {
-          console.log("Response from /initiate:", data);
-          // alert(JSON.stringify(data));
-          // Immediately refresh logs & LLM
+          alert(JSON.stringify(data));
+          // Refresh everything right away
           fetchLogs();
           fetchLlmOutputs();
+          fetchRecentRows();
         })
         .catch(error => {
           console.error("Error calling /initiate:", error);
         });
     });
+
+    // Manual refresh buttons
+    document.getElementById('refreshLogsBtn').addEventListener('click', fetchLogs);
+    document.getElementById('refreshLlmBtn').addEventListener('click', fetchLlmOutputs);
+    document.getElementById('refreshRowsBtn').addEventListener('click', fetchRecentRows);
+
+    // Auto-refresh every 5 seconds
+    setInterval(fetchLogs, 5000);
+    setInterval(fetchLlmOutputs, 5000);
+    setInterval(fetchRecentRows, 5000);
+
+    // Initial fetch on page load
+    fetchLogs();
+    fetchLlmOutputs();
+    fetchRecentRows();
   </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 import psycopg2
 import logging
 from datetime import datetime
@@ -99,6 +99,7 @@ def get_db_connection():
     conn = psycopg2.connect(**db_params)
     return conn
     
+
 # Function to insert account data into the database
 def insert_account_data(run_id, message_id, table_data):
     # connect to the database

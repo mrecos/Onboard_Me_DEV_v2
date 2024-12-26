@@ -107,4 +107,32 @@ def get_users():
 def get_llm_outputs():
     """Return the stored LLM outputs (Markdown) as JSON."""
     return jsonify(llm_outputs)
+
+@api_v1.route('/recent_rows')
+def recent_rows():
+    user_id = request.args.get('user_id', None)
+    if not user_id:
+        return jsonify({"error": "No user_id provided"}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
     
+    # Example: Let's say you have a table "user_accounts_tracking" 
+    # and you want the last 10 rows for that user, ordered by some ID or timestamp.
+    query = """
+    SELECT *
+    FROM user_accounts_tracking
+    WHERE user_id = %s
+    ORDER BY run_id DESC -- or created_at DESC, whichever is relevant
+    LIMIT 10
+    """
+    c.execute(query, (user_id,))
+    rows = c.fetchall()
+
+    # Get column names for building a list of dicts
+    columns = [desc[0] for desc in c.description]
+    data = [dict(zip(columns, row)) for row in rows]
+
+    conn.close()
+    return jsonify(data)
+
