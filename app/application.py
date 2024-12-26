@@ -4,7 +4,6 @@ from flask import Flask, render_template, request, jsonify, Blueprint # for flas
 # import app functions
 from app.templates.api.v1.endpoints import api_v1
 from app.templates.api.v2.endpoints import api_v2
-from app.shared_state import log_messages, llm_outputs, add_log
 
 
 # from openai import OpenAI     # for openAI assistant
