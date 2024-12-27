@@ -5,9 +5,13 @@ from json import dumps        # for json dumps
 from json import loads        # for json loads
 import time 
 from flask import Blueprint, jsonify, request
+import datetime
+# from flask_limiter import Limiter
+# from flask_limiter.util import get_remote_address
 from app.core import (
     log_messages,
     llm_outputs,
+    limiter,
     add_log,
     get_db_connection,
     convo_interpretor,
@@ -16,6 +20,12 @@ from app.core import (
 )
 
 api_v1 = Blueprint('api_v1', __name__)
+
+@api_v1.route('/test')
+@limiter.limit("3 per minute")
+def rate_test():
+    test_message = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " this is just a test"
+    return jsonify(test_message)
 
 @api_v1.route('/initiate', methods=['GET'])
 def init_convo():

@@ -1,5 +1,7 @@
 # import libraries
 from flask import Flask, render_template
+# from app.core import create_limiter
+from app.core import limiter
 
 # import app functions
 from app.templates.api.v1.endpoints import api_v1
@@ -10,6 +12,10 @@ logging.basicConfig(level=logging.DEBUG)
 
 # initialize flask app
 app = Flask(__name__)
+limiter.init_app(app)  # Initialize limiter with app
+# limiter = create_limiter(app)
+
+
 # Register blueprints with version prefixes
 app.register_blueprint(api_v1, url_prefix='/api/v1')
 app.register_blueprint(api_v2, url_prefix='/api/v2')

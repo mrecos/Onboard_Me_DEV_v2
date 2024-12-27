@@ -1,4 +1,6 @@
 from flask import Flask, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import psycopg2
 import logging
 from datetime import datetime
@@ -45,11 +47,18 @@ from langchain_core.prompts import (
     MessagesPlaceholder,
 )
 from langchain.output_parsers import PydanticOutputParser
-
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Global variables
 log_messages = []
 llm_outputs = []
+# Initialize limiter without app
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "20 per hour"]
+)
+
 
 # Authentification for OpenAI
 def openAI_auth():
@@ -65,6 +74,14 @@ def openAI_auth():
 # authentification for OpenAI
 chat = openAI_auth()
 
+# def create_limiter(app):
+#     limiter = Limiter(
+#         app=app,
+#         key_func=get_remote_address,
+#         default_limits=["5 per minute"],
+#         storage_uri="memory://"
+#     )
+#     return limiter
 
 def add_log(message):
     """Append a log message with a timestamp to the global list."""
