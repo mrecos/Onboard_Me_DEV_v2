@@ -22,12 +22,13 @@ from app.core import (
 api_v1 = Blueprint('api_v1', __name__)
 
 @api_v1.route('/test')
-@limiter.limit("3 per minute")
+@limiter.limit("30 per minute")
 def rate_test():
     test_message = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " this is just a test"
     return jsonify(test_message)
 
 @api_v1.route('/initiate', methods=['GET'])
+@limiter.limit("30 per hour")
 def init_convo():
     user_id = request.args.get('user_id', None)
     if not user_id:
